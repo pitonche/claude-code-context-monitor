@@ -1,8 +1,2 @@
-# Claude Code Odometer Monitor - Requirements
-# All dependencies are built-in with Python 3.8+
-
-# No external dependencies required for core functionality
-# tkinter comes bundled with Python
-
-# Optional dependencies for development/testing:
-# pytest>=7.0.0  # For unit tests
+# Claude Code Context Monitor - Requirements
+psutil>=6.1.0  # Process monitoring for auto-close feature (optional)

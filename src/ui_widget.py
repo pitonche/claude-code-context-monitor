@@ -27,7 +27,7 @@ class OdometerWidget:
         self.compress_callback = None
 
         # Configure root window
-        self.root.title("Claude Code Tokens")
+        self.root.title("Context Monitor")
         self.root.geometry(f"{Config.WINDOW_WIDTH}x{Config.WINDOW_HEIGHT}")
         self.root.configure(bg=Config.BG_COLOR)
 
@@ -48,7 +48,7 @@ class OdometerWidget:
         # Title label
         self.title_label = tk.Label(
             self.root,
-            text="Claude Code Tokens",
+            text="Context Monitor",
             font=("Arial", 10),
             bg=Config.BG_COLOR,
             fg=Config.TEXT_SECONDARY,
@@ -119,10 +119,10 @@ class OdometerWidget:
         )
         self.plan_label.pack(pady=(0, 5))
 
-        # Compress button (will be implemented in Phase 3)
+        # Compact button
         self.compress_button = tk.Button(
             self.root,
-            text="Compress Context",
+            text="Compact Context",
             font=("Arial", 10),
             bg="#555555",
             fg="#888888",

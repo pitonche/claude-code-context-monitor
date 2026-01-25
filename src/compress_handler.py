@@ -38,9 +38,9 @@ class CompressHandler:
 
         # Show notification
         messagebox.showinfo(
-            "Compress Command Ready",
+            "Compact Command Ready",
             "The command '/compact' has been copied to your clipboard.\n\n"
-            "Paste it into your Claude Code terminal to compress the context.",
+            "Paste it into your Claude Code terminal to compact the context.",
             parent=self.root
         )
 

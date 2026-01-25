@@ -1,15 +1,20 @@
 """Main entry point for Claude Code Odometer Monitor"""
 import tkinter as tk
 import json
+import time
 from pathlib import Path
 try:
     from .config import Config
     from .ui_widget import OdometerWidget
     from .compress_handler import create_compress_handler
+    from .data_reader import find_active_session
+    from .process_monitor import ProcessMonitor
 except ImportError:
     from config import Config
     from ui_widget import OdometerWidget
     from compress_handler import create_compress_handler
+    from data_reader import find_active_session
+    from process_monitor import ProcessMonitor
 
 
 def load_window_position(root: tk.Tk) -> bool:
@@ -83,6 +88,20 @@ def save_and_quit(root: tk.Tk):
     root.quit()
 
 
+def wait_for_session() -> bool:
+    """Wait for Claude Code session file during startup"""
+    time.sleep(Config.STARTUP_DELAY_MS / 1000)
+
+    for attempt in range(Config.STARTUP_MAX_RETRIES):
+        session_path = find_active_session()
+        if session_path is not None:
+            return True
+        if attempt < Config.STARTUP_MAX_RETRIES - 1:
+            time.sleep(Config.STARTUP_RETRY_INTERVAL_MS / 1000)
+
+    return False
+
+
 def main():
     """Main application entry point"""
 
@@ -92,9 +111,20 @@ def main():
     # Initialize odometer widget
     odometer = OdometerWidget(root)
 
+    # Wait for session file to appear
+    root.update()  # Show window
+    wait_for_session()  # Wait for up to ~6.5 seconds
+
     # Initialize compress handler
     compress_handler = create_compress_handler(root)
     odometer.set_compress_callback(compress_handler.execute_compress)
+
+    # Initialize process monitor
+    process_monitor = ProcessMonitor(Config.AUTO_CLOSE_PROCESS_NAME)
+
+    # Track consecutive "no process" checks
+    no_process_count = 0
+    grace_period_checks = Config.AUTO_CLOSE_GRACE_PERIOD_MS // Config.AUTO_CLOSE_CHECK_INTERVAL_MS
 
     # Load saved window position (or center if first run)
     if not load_window_position(root):
@@ -115,6 +145,27 @@ def main():
 
     # Schedule first refresh
     root.after(Config.REFRESH_INTERVAL_MS, refresh)
+
+    # Process monitoring loop
+    def check_processes():
+        nonlocal no_process_count
+
+        if process_monitor.should_auto_close():
+            no_process_count += 1
+
+            # If no processes for grace period, close
+            if no_process_count >= grace_period_checks:
+                save_and_quit(root)
+                return
+        else:
+            no_process_count = 0  # Reset when processes detected
+
+        # Schedule next check
+        root.after(Config.AUTO_CLOSE_CHECK_INTERVAL_MS, check_processes)
+
+    # Start process monitoring if enabled
+    if process_monitor.enabled:
+        root.after(Config.AUTO_CLOSE_CHECK_INTERVAL_MS, check_processes)
 
     # Save position on close
     root.protocol("WM_DELETE_WINDOW", lambda: save_and_quit(root))

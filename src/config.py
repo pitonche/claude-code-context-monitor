@@ -20,6 +20,11 @@ class Config:
     # Polling settings
     REFRESH_INTERVAL_MS = 2000  # 2 seconds
 
+    # Startup delay settings
+    STARTUP_DELAY_MS = 1500  # Initial delay before first check
+    STARTUP_MAX_RETRIES = 10  # Maximum retry attempts
+    STARTUP_RETRY_INTERVAL_MS = 500  # 500ms between retries
+
     # Claude Code directories
     CLAUDE_PROJECTS_DIR = Path.home() / ".claude" / "projects"
 
@@ -42,6 +47,12 @@ class Config:
 
     # Compress button settings
     COMPRESS_THRESHOLD = 70.0  # Enable button at 70% usage
+
+    # Auto-close settings
+    AUTO_CLOSE_ENABLED = True  # Enable auto-close when Claude Code exits
+    AUTO_CLOSE_PROCESS_NAME = "claude.exe"  # Windows process name
+    AUTO_CLOSE_CHECK_INTERVAL_MS = 5000  # Check every 5 seconds
+    AUTO_CLOSE_GRACE_PERIOD_MS = 10000  # Wait 10s after last process exits
 
     # Persistence
     CONFIG_DIR = Path.home() / ".claude-monitor"
