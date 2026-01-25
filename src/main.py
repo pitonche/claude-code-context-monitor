@@ -2,6 +2,7 @@
 import tkinter as tk
 import json
 import time
+import os
 from pathlib import Path
 try:
     from .config import Config
@@ -15,6 +16,72 @@ except ImportError:
     from compress_handler import create_compress_handler
     from data_reader import find_active_session
     from process_monitor import ProcessMonitor
+
+
+# Global mutex handle for single instance enforcement
+_mutex_handle = None
+
+
+def acquire_lock() -> bool:
+    """
+    Try to acquire exclusive lock using Windows named mutex.
+    This prevents race conditions when multiple instances start simultaneously.
+
+    Returns:
+        True if lock was acquired, False if another instance is running
+    """
+    global _mutex_handle
+
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.windll.kernel32
+
+        # Define Windows constants
+        ERROR_ALREADY_EXISTS = 183
+
+        # Create or open named mutex
+        # Mutex name must be unique to this application
+        mutex_name = "Global\\ClaudeCodeOdometerMonitor"
+
+        _mutex_handle = kernel32.CreateMutexW(
+            None,  # default security
+            True,  # initial owner
+            mutex_name
+        )
+
+        if not _mutex_handle:
+            return True  # On error, allow launch
+
+        # Check if mutex already existed
+        last_error = kernel32.GetLastError()
+        if last_error == ERROR_ALREADY_EXISTS:
+            # Another instance is running
+            kernel32.CloseHandle(_mutex_handle)
+            _mutex_handle = None
+            return False
+
+        # Successfully acquired mutex
+        return True
+
+    except Exception:
+        return True  # On error, allow launch
+
+
+def release_lock():
+    """Release the mutex."""
+    global _mutex_handle
+
+    if _mutex_handle:
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            kernel32.ReleaseMutex(_mutex_handle)
+            kernel32.CloseHandle(_mutex_handle)
+            _mutex_handle = None
+        except Exception:
+            pass
 
 
 def load_window_position(root: tk.Tk) -> bool:
@@ -85,6 +152,7 @@ def save_and_quit(root: tk.Tk):
         root: tkinter root window
     """
     save_window_position(root)
+    release_lock()
     root.quit()
 
 
@@ -105,15 +173,15 @@ def wait_for_session() -> bool:
 def main():
     """Main application entry point"""
 
+    # Check for duplicate instance
+    if not acquire_lock():
+        return  # Another instance running, exit silently
+
     # Create root window
     root = tk.Tk()
 
     # Initialize odometer widget
     odometer = OdometerWidget(root)
-
-    # Wait for session file to appear
-    root.update()  # Show window
-    wait_for_session()  # Wait for up to ~6.5 seconds
 
     # Initialize compress handler
     compress_handler = create_compress_handler(root)
@@ -134,6 +202,10 @@ def main():
         x = (screen_width - Config.WINDOW_WIDTH) // 2
         y = (screen_height - Config.WINDOW_HEIGHT) // 2
         root.geometry(f"+{x}+{y}")
+
+    # Enable always-on-top if configured
+    if Config.ALWAYS_ON_TOP:
+        root.attributes("-topmost", True)
 
     # Start refresh loop
     def refresh():
@@ -167,7 +239,7 @@ def main():
     if process_monitor.enabled:
         root.after(Config.AUTO_CLOSE_CHECK_INTERVAL_MS, check_processes)
 
-    # Save position on close
+    # Save position on close (save_and_quit handles lock release)
     root.protocol("WM_DELETE_WINDOW", lambda: save_and_quit(root))
 
     # Run main loop

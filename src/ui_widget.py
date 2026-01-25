@@ -31,8 +31,7 @@ class OdometerWidget:
         self.root.geometry(f"{Config.WINDOW_WIDTH}x{Config.WINDOW_HEIGHT}")
         self.root.configure(bg=Config.BG_COLOR)
 
-        if Config.ALWAYS_ON_TOP:
-            self.root.attributes("-topmost", True)
+        # Note: topmost is now handled in main() to prevent focus stealing on startup
 
         # Make window draggable
         self._drag_data = {"x": 0, "y": 0}

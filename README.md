@@ -82,21 +82,22 @@ Create `~/.claude/launch-odometer.bat` (Windows) or `~/.claude/launch-odometer.s
 ```batch
 @echo off
 REM Auto-launch script for Claude Code Odometer Monitor
-
-REM Check if already running (prevent duplicates)
-tasklist /FI "IMAGENAME eq pythonw.exe" 2>NUL | find /I /N "pythonw.exe">NUL
-if "%ERRORLEVEL%"=="0" (
-    exit /b 0
-)
+REM This script is designed to be called from Claude Code's SessionStart hook
 
 REM Launch monitor in background (no console window)
+REM Python lock file handles duplicate prevention
+REM Change this path to match your installation directory
 cd /d C:\path\to\claude-code-context-monitor
 start "" pythonw src\main.py
 
 exit /b 0
 ```
 
-**Important**: Replace `C:\path\to\claude-code-context-monitor` with your actual installation path.
+**Important**:
+- Replace `C:\path\to\claude-code-context-monitor` with your actual installation path
+- Do NOT use `/B` flag - it can cause blocking issues
+- The monitor uses a Windows named mutex to prevent duplicate instances automatically
+- No additional duplicate checking needed in the batch file
 
 **Step 2: Configure Claude Code Hooks**
 
@@ -110,8 +111,7 @@ Edit `~/.claude/settings.json` and add the `SessionStart` hook:
         "hooks": [
           {
             "type": "command",
-            "command": "cmd /c C:\\Users\\YourUsername\\.claude\\launch-odometer.bat",
-            "timeout": 5
+            "command": "start /B /MIN cmd /c C:\\Users\\YourUsername\\.claude\\launch-odometer.bat"
           }
         ]
       }
@@ -123,6 +123,8 @@ Edit `~/.claude/settings.json` and add the `SessionStart` hook:
 **Important**:
 - Replace `YourUsername` with your Windows username
 - Use double backslashes (`\\`) in JSON file paths
+- The `start /B /MIN` prefix makes the hook completely non-blocking
+- Do NOT add a `timeout` field - the command returns instantly
 - Keep any existing hooks (Stop, PermissionRequest, etc.)
 - Merge with existing `hooks` object if you already have other hooks configured
 
@@ -131,7 +133,8 @@ Edit `~/.claude/settings.json` and add the `SessionStart` hook:
 1. Close any running monitor windows
 2. Exit Claude Code completely
 3. Start a new Claude Code session
-4. The monitor should appear automatically within 1-2 seconds
+4. Claude Code should open and get focus immediately
+5. The monitor should appear automatically (without stealing focus)
 
 ### Using the Monitor
 
@@ -220,10 +223,21 @@ claude-code-context-monitor/
 
 ## Troubleshooting
 
+### Monitor appears but Claude Code doesn't start
+**Symptoms**: When running Claude Code, the monitor appears but Claude Code itself doesn't appear in the terminal. You have to close the monitor or start a new terminal.
+
+**Solution**: This is caused by a blocking SessionStart hook. Fix it with these steps:
+1. Ensure your `~/.claude/settings.json` SessionStart hook uses: `"command": "start /B /MIN cmd /c C:\\Users\\YourUsername\\.claude\\launch-odometer.bat"`
+2. Do NOT include a `timeout` field in the hook configuration
+3. The `start /B /MIN` prefix makes the hook non-blocking
+
+See [FIX-APPLIED.md](FIX-APPLIED.md) for detailed technical explanation.
+
 ### "No active session" displayed
 - Ensure Claude Code is running
 - Verify `~/.claude/projects/` directory exists
 - Check that Claude Code has created a session JSONL file
+- The monitor starts immediately and will detect sessions within 2 seconds
 
 ### Window appears off-screen
 - Delete `~/.claude-monitor/position.json` to reset position
@@ -269,7 +283,7 @@ claude-code-context-monitor/
 - **Configurable Themes**: Light mode, custom color schemes
 - **Web Dashboard**: Optional web-based monitoring interface
 - **Conditional Launch**: Only auto-start in specific project directories
-- **Auto-Close on Session End**: Optional Stop hook to close monitor with session
+- ~~**Auto-Close on Session End**: Optional Stop hook to close monitor with session~~ ✓ Implemented (v1.1)
 
 ### Contributing Ideas
 
