@@ -7,13 +7,11 @@ from pathlib import Path
 try:
     from .config import Config
     from .ui_widget import OdometerWidget
-    from .compress_handler import create_compress_handler
     from .data_reader import find_active_session
     from .process_monitor import ProcessMonitor
 except ImportError:
     from config import Config
     from ui_widget import OdometerWidget
-    from compress_handler import create_compress_handler
     from data_reader import find_active_session
     from process_monitor import ProcessMonitor
 
@@ -182,10 +180,6 @@ def main():
 
     # Initialize odometer widget
     odometer = OdometerWidget(root)
-
-    # Initialize compress handler
-    compress_handler = create_compress_handler(root)
-    odometer.set_compress_callback(compress_handler.execute_compress)
 
     # Initialize process monitor
     process_monitor = ProcessMonitor(Config.AUTO_CLOSE_PROCESS_NAME)

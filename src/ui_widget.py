@@ -3,43 +3,87 @@ import tkinter as tk
 from tkinter import ttk
 from pathlib import Path
 try:
-    from .config import Config
+    from .config import Config, MODEL_INFO, DEFAULT_MODEL_NAME, DEFAULT_MODEL_LIMIT
     from .data_reader import get_current_usage, extract_project_name
     from .token_calculator import TokenCalculator
 except ImportError:
-    from config import Config
+    from config import Config, MODEL_INFO, DEFAULT_MODEL_NAME, DEFAULT_MODEL_LIMIT
     from data_reader import get_current_usage, extract_project_name
     from token_calculator import TokenCalculator
+
+
+# Base sizes — the reference dimensions fonts were designed for
+BASE_WIDTH = 280
+BASE_HEIGHT = 160
 
 
 class OdometerWidget:
     """Floating odometer widget displaying token usage"""
 
     def __init__(self, root: tk.Tk):
-        """
-        Initialize the odometer widget.
-
-        Args:
-            root: tkinter root window
-        """
         self.root = root
         self.calculator = TokenCalculator()
-        self.compress_callback = None
 
         # Configure root window
         self.root.title("Context Monitor")
         self.root.geometry(f"{Config.WINDOW_WIDTH}x{Config.WINDOW_HEIGHT}")
         self.root.configure(bg=Config.BG_COLOR)
-
-        # Note: topmost is now handled in main() to prevent focus stealing on startup
+        self.root.minsize(200, 120)
 
         # Make window draggable
         self._drag_data = {"x": 0, "y": 0}
         self.root.bind("<Button-1>", self._on_drag_start)
         self.root.bind("<B1-Motion>", self._on_drag_motion)
 
+        # Track resize
+        self._last_width = Config.WINDOW_WIDTH
+        self._last_height = Config.WINDOW_HEIGHT
+        self.root.bind("<Configure>", self._on_resize)
+
         # Create UI elements
         self._create_widgets()
+
+    def _scale(self, base_size: int) -> int:
+        """Scale a font size based on current window dimensions relative to base."""
+        w = self.root.winfo_width() or BASE_WIDTH
+        h = self.root.winfo_height() or BASE_HEIGHT
+        factor = min(w / BASE_WIDTH, h / BASE_HEIGHT)
+        return max(int(base_size * factor), 6)
+
+    def _on_resize(self, event):
+        """Handle window resize — rescale fonts and progress bar."""
+        if event.widget != self.root:
+            return
+        w, h = event.width, event.height
+        if w == self._last_width and h == self._last_height:
+            return
+        self._last_width = w
+        self._last_height = h
+        self._rescale_ui(w, h)
+
+    def _rescale_ui(self, w, h):
+        """Rescale all UI elements to match current window size."""
+        factor = min(w / BASE_WIDTH, h / BASE_HEIGHT)
+
+        self.title_label.config(font=("Arial", max(int(10 * factor), 6)))
+        self.project_label.config(font=("Arial", max(int(8 * factor), 6)))
+        self.percentage_label.config(font=("Arial", max(int(36 * factor), 10), "bold"))
+        self.token_label.config(font=("Arial", max(int(10 * factor), 6)))
+        self.plan_label.config(font=("Arial", max(int(9 * factor), 6)))
+        # Resize progress bar
+        bar_w = w - 20
+        bar_h = max(int(20 * factor), 8)
+        self.progress_canvas.config(width=bar_w, height=bar_h)
+        self.progress_canvas.coords(self.progress_bg, 0, 0, bar_w, bar_h)
+        # Recalculate foreground width from current percentage
+        pct_text = self.percentage_label.cget("text")
+        try:
+            pct = float(pct_text.replace("%", ""))
+        except ValueError:
+            pct = 0
+        fg_w = int((pct / 100) * bar_w)
+        fg_w = min(fg_w, bar_w)
+        self.progress_canvas.coords(self.progress_fg, 0, 0, fg_w, bar_h)
 
     def _create_widgets(self):
         """Create all UI elements"""
@@ -101,7 +145,7 @@ class OdometerWidget:
         # Token count label
         self.token_label = tk.Label(
             self.root,
-            text="0 / 88,000 tokens",
+            text="0 / 200,000 tokens",
             font=("Arial", 10),
             bg=Config.BG_COLOR,
             fg=Config.TEXT_COLOR,
@@ -111,26 +155,13 @@ class OdometerWidget:
         # Plan label
         self.plan_label = tk.Label(
             self.root,
-            text=f"[{Config.PLAN_NAME} Plan]",
+            text=f"[{Config.PLAN_NAME}]",
             font=("Arial", 9),
             bg=Config.BG_COLOR,
             fg=Config.TEXT_SECONDARY,
         )
         self.plan_label.pack(pady=(0, 5))
 
-        # Compact button
-        self.compress_button = tk.Button(
-            self.root,
-            text="Compact Context",
-            font=("Arial", 10),
-            bg="#555555",
-            fg="#888888",
-            activebackground="#666666",
-            relief=tk.FLAT,
-            state=tk.DISABLED,
-            command=self._on_compress_click,
-        )
-        self.compress_button.pack(pady=(5, 5))
 
     def _on_drag_start(self, event):
         """Handle drag start event"""
@@ -143,28 +174,21 @@ class OdometerWidget:
         y = self.root.winfo_y() + (event.y - self._drag_data["y"])
         self.root.geometry(f"+{x}+{y}")
 
-    def _on_compress_click(self):
-        """Handle compress button click"""
-        if self.compress_callback:
-            self.compress_callback()
-
-    def set_compress_callback(self, callback):
-        """
-        Set callback function for compress button.
-
-        Args:
-            callback: Function to call when compress button is clicked
-        """
-        self.compress_callback = callback
-
     def update_display(self):
         """Update display with current token usage"""
-        total_tokens, session_path = get_current_usage()
+        total_tokens, session_path, model_id = get_current_usage()
 
         if session_path is None:
-            # No active session
             self._show_no_session()
             return
+
+        # Update model info dynamically
+        if model_id and model_id in MODEL_INFO:
+            info = MODEL_INFO[model_id]
+            self.calculator.plan_limit = info["limit"]
+            self.plan_label.config(text=f"[{info['name']}]")
+        elif model_id:
+            self.plan_label.config(text=f"[{model_id}]")
 
         # Extract and display project name
         project_name = extract_project_name(session_path)
@@ -181,10 +205,17 @@ class OdometerWidget:
             fg=color
         )
 
-        # Update progress bar
-        bar_width = int((pct / 100) * 260)
-        bar_width = min(bar_width, 260)  # Cap at 100%
-        self.progress_canvas.coords(self.progress_fg, 0, 0, bar_width, 20)
+        # Update progress bar using current window width
+        w = self.root.winfo_width() or BASE_WIDTH
+        h = self.root.winfo_height() or BASE_HEIGHT
+        factor = min(w / BASE_WIDTH, h / BASE_HEIGHT)
+        bar_w = w - 20
+        bar_h = max(int(20 * factor), 8)
+        self.progress_canvas.config(width=bar_w, height=bar_h)
+        self.progress_canvas.coords(self.progress_bg, 0, 0, bar_w, bar_h)
+        fg_w = int((pct / 100) * bar_w)
+        fg_w = min(fg_w, bar_w)
+        self.progress_canvas.coords(self.progress_fg, 0, 0, fg_w, bar_h)
         self.progress_canvas.itemconfig(self.progress_fg, fill=color)
 
         # Update token count label
@@ -194,20 +225,6 @@ class OdometerWidget:
             text=f"{tokens:,} / {limit:,} tokens",
             fg=Config.TEXT_COLOR
         )
-
-        # Update compress button
-        if usage_data["compress_enabled"]:
-            self.compress_button.config(
-                state=tk.NORMAL,
-                bg="#4CAF50",
-                fg="#FFFFFF"
-            )
-        else:
-            self.compress_button.config(
-                state=tk.DISABLED,
-                bg="#555555",
-                fg="#888888"
-            )
 
     def _show_no_session(self):
         """Show 'No active session' state"""
@@ -226,9 +243,3 @@ class OdometerWidget:
             fg=Config.TEXT_SECONDARY
         )
 
-        # Disable compress button
-        self.compress_button.config(
-            state=tk.DISABLED,
-            bg="#555555",
-            fg="#888888"
-        )

@@ -96,20 +96,20 @@ def extract_tokens_from_entry(entry: dict) -> int:
     return tokens
 
 
-def read_session_tokens(jsonl_path: Path) -> int:
+def read_session_tokens(jsonl_path: Path) -> tuple[int, Optional[str]]:
     """
-    Read current token usage from a JSONL session file.
+    Read current token usage and model from a JSONL session file.
 
-    Returns the token count from the MOST RECENT assistant message,
-    which represents the current context size (not the sum of all messages).
+    Returns the token count and model from the MOST RECENT assistant message.
 
     Args:
         jsonl_path: Path to the JSONL file
 
     Returns:
-        Current token count from the most recent entry
+        Tuple of (token_count, model_id)
     """
     last_tokens = 0
+    last_model = None
 
     try:
         with open(jsonl_path, "r", encoding="utf-8") as f:
@@ -121,30 +121,32 @@ def read_session_tokens(jsonl_path: Path) -> int:
                 try:
                     entry = json.loads(line)
                     tokens = extract_tokens_from_entry(entry)
-                    if tokens > 0:  # Only update if this is an assistant message
+                    if tokens > 0:
                         last_tokens = tokens
+                        model = entry.get("message", {}).get("model")
+                        if model:
+                            last_model = model
                 except json.JSONDecodeError:
-                    # Skip invalid JSON lines
                     continue
 
     except (FileNotFoundError, PermissionError, OSError):
-        return 0
+        return 0, None
 
-    return last_tokens
+    return last_tokens, last_model
 
 
-def get_current_usage() -> tuple[int, Optional[Path]]:
+def get_current_usage() -> tuple[int, Optional[Path], Optional[str]]:
     """
     Get current token usage from the most active session.
 
     Returns:
-        Tuple of (total_tokens, session_path)
-        If no active session, returns (0, None)
+        Tuple of (total_tokens, session_path, model_id)
+        If no active session, returns (0, None, None)
     """
     session_path = find_active_session()
 
     if session_path is None:
-        return 0, None
+        return 0, None, None
 
-    total_tokens = read_session_tokens(session_path)
-    return total_tokens, session_path
+    total_tokens, model = read_session_tokens(session_path)
+    return total_tokens, session_path, model

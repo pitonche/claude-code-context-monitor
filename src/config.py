@@ -2,20 +2,24 @@
 from pathlib import Path
 
 
-class PlanLimits:
-    """Token limits for different Claude Code plans"""
-    PRO = 44000
-    MAX5 = 88000
-    MAX20 = 220000
-    SONNET_45 = 200000  # Sonnet 4.5 context window
+MODEL_INFO = {
+    "claude-opus-4-6":            {"name": "Opus 4.6",   "limit": 200000},
+    "claude-opus-4-5-20251101":   {"name": "Opus 4.5",   "limit": 200000},
+    "claude-sonnet-4-6":          {"name": "Sonnet 4.6",  "limit": 200000},
+    "claude-sonnet-4-5-20250929": {"name": "Sonnet 4.5",  "limit": 200000},
+    "claude-haiku-4-5-20251001":  {"name": "Haiku 4.5",   "limit": 200000},
+}
+
+DEFAULT_MODEL_NAME = "Unknown"
+DEFAULT_MODEL_LIMIT = 200000
 
 
 class Config:
     """Main configuration for the odometer monitor"""
 
-    # Plan settings
-    PLAN_LIMIT = PlanLimits.SONNET_45
-    PLAN_NAME = "Sonnet 4.5"
+    # Plan settings (defaults, overridden dynamically)
+    PLAN_LIMIT = DEFAULT_MODEL_LIMIT
+    PLAN_NAME = DEFAULT_MODEL_NAME
 
     # Polling settings
     REFRESH_INTERVAL_MS = 2000  # 2 seconds
@@ -29,8 +33,8 @@ class Config:
     CLAUDE_PROJECTS_DIR = Path.home() / ".claude" / "projects"
 
     # Window settings
-    WINDOW_WIDTH = 280
-    WINDOW_HEIGHT = 160  # Increased to accommodate project name label
+    WINDOW_WIDTH = 420
+    WINDOW_HEIGHT = 240  # Increased to accommodate project name label
     ALWAYS_ON_TOP = True
 
     # Color thresholds and values
