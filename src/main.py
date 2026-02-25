@@ -2,8 +2,6 @@
 import tkinter as tk
 import json
 import time
-import os
-from pathlib import Path
 try:
     from .config import Config
     from .ui_widget import OdometerWidget
@@ -32,7 +30,6 @@ def acquire_lock() -> bool:
 
     try:
         import ctypes
-        from ctypes import wintypes
 
         kernel32 = ctypes.windll.kernel32
 

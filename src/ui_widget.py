@@ -1,13 +1,11 @@
 """Odometer UI widget using tkinter"""
 import tkinter as tk
-from tkinter import ttk
-from pathlib import Path
 try:
-    from .config import Config, MODEL_INFO, DEFAULT_MODEL_NAME, DEFAULT_MODEL_LIMIT
+    from .config import Config, MODEL_INFO
     from .data_reader import get_current_usage, extract_project_name
     from .token_calculator import TokenCalculator
 except ImportError:
-    from config import Config, MODEL_INFO, DEFAULT_MODEL_NAME, DEFAULT_MODEL_LIMIT
+    from config import Config, MODEL_INFO
     from data_reader import get_current_usage, extract_project_name
     from token_calculator import TokenCalculator
 

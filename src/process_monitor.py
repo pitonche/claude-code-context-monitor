@@ -1,6 +1,5 @@
 """Process monitoring for Claude Code instances"""
 import logging
-from typing import Optional
 
 try:
     import psutil

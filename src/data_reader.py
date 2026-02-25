@@ -1,7 +1,7 @@
 """Data reader for Claude Code JSONL log files"""
 import json
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 try:
     from .config import Config
 except ImportError:
